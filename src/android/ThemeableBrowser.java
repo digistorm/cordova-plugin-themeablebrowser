@@ -1315,7 +1315,7 @@ public class ThemeableBrowser extends CordovaPlugin {
                                 sendUpdate(obj, true);
                                 return true;
                             } catch (JSONException ex) {
-                                LOG.e(LOG_TAG, "Custom Scheme URI passed in has caused a JSON error.");
+                                Log.e(LOG_TAG, "Custom Scheme URI passed in has caused a JSON error.");
                             }
                         }
                     }
