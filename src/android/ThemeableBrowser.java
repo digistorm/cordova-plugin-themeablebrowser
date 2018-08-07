@@ -105,6 +105,7 @@ public class ThemeableBrowser extends CordovaPlugin {
     private static final String WRN_UNDEFINED = "undefined";
 
     private ThemeableBrowserDialog dialog;
+    private InAppBrowserDownloads downloads;
     private WebView inAppWebView;
     private EditText edittext;
     private CallbackContext callbackContext;
@@ -979,10 +980,24 @@ public class ThemeableBrowser extends CordovaPlugin {
                 if(features.hidden) {
                     dialog.hide();
                 }
+
+                if (ThemeableBrowser.this.downloads == null) {
+                    ThemeableBrowser.this.downloads = new InAppBrowserDownloads(ThemeableBrowser.this);
+                }
+                
+                inAppWebView.setDownloadListener(
+                    ThemeableBrowser.this.downloads
+                );
             }
         };
         this.cordova.getActivity().runOnUiThread(runnable);
         return "";
+    }
+
+    public void onRequestPermissionResult(int requestCode, String[] permissions, int[] grantResults) throws JSONException {
+        if (ThemeableBrowser.this.downloads != null) {
+            ThemeableBrowser.this.downloads.onRequestPermissionResult(requestCode, permissions, grantResults);
+        }
     }
 
     /**
