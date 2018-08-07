@@ -12,6 +12,7 @@ import android.app.DownloadManager;
 import android.os.Environment;
 import android.webkit.DownloadListener;
 import android.webkit.URLUtil;
+import android.webkit.CookieManager;
 import android.widget.Toast;
 
 import static android.content.Context.DOWNLOAD_SERVICE;
@@ -72,7 +73,15 @@ public class InAppBrowserDownloads implements DownloadListener{
 
     protected void processDownload() {
         DownloadManager.Request request = new DownloadManager.Request(Uri.parse(InAppBrowserDownloads.this.url));
+
         try {
+            request.setMimeType(InAppBrowserDownloads.this.mimetype);
+            //------------------------COOKIE!!------------------------
+            String cookies = CookieManager.getInstance().getCookie(InAppBrowserDownloads.this.url);
+            request.addRequestHeader("cookie", cookies);
+            //------------------------COOKIE!!------------------------
+            request.addRequestHeader("User-Agent", InAppBrowserDownloads.this.userAgent);
+
             request.allowScanningByMediaScanner();
             request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED); //Notify client once download is completed!
             final String filename = URLUtil.guessFileName(InAppBrowserDownloads.this.url, InAppBrowserDownloads.this.contentDisposition, InAppBrowserDownloads.this.mimetype);
