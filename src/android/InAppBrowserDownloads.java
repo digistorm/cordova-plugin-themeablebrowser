@@ -178,7 +178,7 @@ public class InAppBrowserDownloads implements DownloadListener{
             if (ContentResolver.SCHEME_FILE.equals(attachmentUri.getScheme())) {
                 // FileUri - Convert it to contentUri.
                 File file = new File(attachmentUri.getPath());
-                attachmentUri = FileProvider.getUriForFile(plugin.cordova.getActivity(), cordova.getActivity().getPackageName(), file);
+                attachmentUri = FileProvider.getUriForFile(context, plugin.cordova.getActivity().getPackageName()+".themeablebrowser.provider", file);
             }
 
             Intent openAttachmentIntent = new Intent(Intent.ACTION_VIEW);
@@ -187,7 +187,7 @@ public class InAppBrowserDownloads implements DownloadListener{
             try {
                 context.startActivity(openAttachmentIntent);
             } catch (Exception e) {
-                Toast.makeText(context, context.getString(R.string.unable_to_open_file), Toast.LENGTH_LONG).show();
+                Toast.makeText(context, "Error opening downloaded file", Toast.LENGTH_LONG).show();
             }
         }
     }
