@@ -174,17 +174,18 @@ public class InAppBrowserDownloads implements DownloadListener{
     */
     private void openDownloadedAttachment(final Context context, Uri attachmentUri, final String attachmentMimeType) {
         if(attachmentUri!=null) {
-            // Get Content Uri.
-            if (ContentResolver.SCHEME_FILE.equals(attachmentUri.getScheme())) {
-                // FileUri - Convert it to contentUri.
-                File file = new File(attachmentUri.getPath());
-                attachmentUri = FileProvider.getUriForFile(context, plugin.cordova.getActivity().getPackageName()+".themeablebrowser.provider", file);
-            }
-
-            Intent openAttachmentIntent = new Intent(Intent.ACTION_VIEW);
-            openAttachmentIntent.setDataAndType(attachmentUri, attachmentMimeType);
-            openAttachmentIntent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             try {
+                // Get Content Uri.
+                if (ContentResolver.SCHEME_FILE.equals(attachmentUri.getScheme())) {
+                    // FileUri - Convert it to contentUri.
+                    File file = new File(attachmentUri.getPath());
+                    attachmentUri = FileProvider.getUriForFile(context, plugin.cordova.getActivity().getPackageName()+".themeablebrowser.provider", file);
+                }
+
+                Intent openAttachmentIntent = new Intent(Intent.ACTION_VIEW);
+                openAttachmentIntent.setDataAndType(attachmentUri, attachmentMimeType);
+                openAttachmentIntent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
                 context.startActivity(openAttachmentIntent);
             } catch (Exception e) {
                 Toast.makeText(context, "Error opening downloaded file", Toast.LENGTH_LONG).show();
