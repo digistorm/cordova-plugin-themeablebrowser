@@ -21,6 +21,9 @@ import android.content.IntentFilter;
 import android.content.BroadcastReceiver;
 import android.content.ContentResolver;
 import java.io.File;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import android.support.v4.content.FileProvider;
 
 import static android.content.Context.DOWNLOAD_SERVICE;
@@ -79,6 +82,32 @@ public class InAppBrowserDownloads implements DownloadListener{
         }
     }
 
+    /** Regex used to parse content-disposition headers */
+    private static final Pattern ANY_CONTENT_DISPOSITION_PATTERN =
+            Pattern.compile("filename\\s*=\\s*(\"?)([^\"]*)\\1\\s*$",
+                    Pattern.CASE_INSENSITIVE);
+
+    /*
+     * Parse the Content-Disposition HTTP Header. The format of the header
+     * is defined here: http://www.w3.org/Protocols/rfc2616/rfc2616-sec19.html
+     * This header provides a filename for content that is going to be
+     * downloaded to the file system. We only support the attachment type.
+     * Note that RFC 2616 specifies the filename value must be double-quoted.
+     * Unfortunately some servers do not quote the value so to maintain
+     * consistent behaviour with other browsers, we allow unquoted values too.
+     */
+    static String parseAnyContentDisposition(String contentDisposition) {
+        try {
+            Matcher m = ANY_CONTENT_DISPOSITION_PATTERN.matcher(contentDisposition);
+            if (m.find()) {
+                return m.group(2);
+            }
+        } catch (IllegalStateException ex) {
+            // This function is defined as returning null when it can't parse the header
+        }
+        return null;
+    }
+
     protected void processDownload() {
         DownloadManager.Request request = new DownloadManager.Request(Uri.parse(InAppBrowserDownloads.this.url));
         plugin.cordova.getActivity().registerReceiver(attachmentDownloadCompleteReceive, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
@@ -90,7 +119,12 @@ public class InAppBrowserDownloads implements DownloadListener{
             request.addRequestHeader("User-Agent", InAppBrowserDownloads.this.userAgent);
             request.allowScanningByMediaScanner();
             request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED); // Notify client once download is completed!
-            final String filename = URLUtil.guessFileName(InAppBrowserDownloads.this.url, InAppBrowserDownloads.this.contentDisposition, InAppBrowserDownloads.this.mimetype);
+
+            // URLUtil.guessFileName doesn't work when the content-disposition is inline so implement our own check
+            String filename = parseAnyContentDisposition(InAppBrowserDownloads.this.contentDisposition);
+            if (filename==null) {
+                filename = URLUtil.guessFileName(InAppBrowserDownloads.this.url, InAppBrowserDownloads.this.contentDisposition, InAppBrowserDownloads.this.mimetype);
+            }
             request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, filename);
             DownloadManager dm = (DownloadManager) plugin.cordova.getActivity().getSystemService(DOWNLOAD_SERVICE);
             dm.enqueue(request);
