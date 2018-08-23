@@ -42,9 +42,11 @@ import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.View.OnApplyWindowInsetsListener;
 import android.view.ViewGroup;
 import android.view.ViewGroup.LayoutParams;
 import android.view.Window;
+import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
@@ -554,14 +556,21 @@ public class ThemeableBrowser extends CordovaPlugin {
         Runnable runnable = new Runnable() {
             @SuppressLint("NewApi")
             public void run() {
+                // CB-6702 InAppBrowser hangs when opening more than one instance
+                if (dialog != null) {
+                    dialog.dismiss();
+                }
+
                 // Let's create the main dialog
                 dialog = new ThemeableBrowserDialog(cordova.getActivity(),
-                        android.R.style.Theme_Black_NoTitleBar,
+                        android.R.style.Theme_NoTitleBar,
                         features.hardwareback);
+
                 if (!features.disableAnimation) {
                     dialog.getWindow().getAttributes().windowAnimations
                             = android.R.style.Animation_Dialog;
                 }
+
                 dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
                 dialog.setCancelable(true);
                 dialog.setThemeableBrowser(getThemeableBrowser());
@@ -574,6 +583,18 @@ public class ThemeableBrowser extends CordovaPlugin {
                 } else {
                     main = new LinearLayout(cordova.getActivity());
                     ((LinearLayout) main).setOrientation(LinearLayout.VERTICAL);
+
+                }
+
+                // CB-14015 Fix issue with Samsung S8 status bar covering nav
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT_WATCH) {
+                    dialog.getWindow().getDecorView().setOnApplyWindowInsetsListener(new OnApplyWindowInsetsListener() {
+                        @Override
+                        public WindowInsets onApplyWindowInsets(View v, WindowInsets insets) {
+                            v.setPadding(0, insets.getSystemWindowInsetTop(), 0, insets.getSystemWindowInsetBottom());
+                            return insets.consumeSystemWindowInsets();
+                        }
+                    });
                 }
 
                 // Toolbar layout
