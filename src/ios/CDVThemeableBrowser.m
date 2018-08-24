@@ -1268,6 +1268,7 @@
 - (void)stopLoading
 {
     [self.webView stopLoading];
+    self.progressCompleted = YES;
 }
 
 - (void)goBack
@@ -1283,6 +1284,8 @@
 {
     [self emitEventForButton:_browserOptions.backButton];
 
+    self.progressCompleted = YES;
+    
     if (self.webView.canGoBack) {
         [self.webView goBack];
         [self updateButtonDelayed:self.webView];
@@ -1295,6 +1298,8 @@
 {
     [self emitEventForButton:_browserOptions.forwardButton];
 
+    self.progressCompleted = YES;
+    
     [self.webView goForward];
     [self updateButtonDelayed:self.webView];
 }
@@ -1485,7 +1490,13 @@
 
     self.addressLabel.text = NSLocalizedString(@"Loading...", nil);
     self.progressView.progress = 0;
+    self.progressView.hidden = NO;
     self.progressCompleted = NO;
+    
+    if (self.progressTimer != nil) {
+        [self.progressTimer invalidate];
+    }
+    
     // 0.01667 is roughly 1/60, so it will update at 60 FPS
     self.progressTimer = [NSTimer scheduledTimerWithTimeInterval:0.01667 target:self selector:@selector(progressTimerCallback) userInfo:nil repeats:YES];
 
@@ -1497,8 +1508,9 @@
 -(void)progressTimerCallback {
     if (self.progressCompleted) {
         if (self.progressView.progress >= 1) {
-            self.progressView.hidden = true;
+            self.progressView.hidden = YES;
             [self.progressTimer invalidate];
+            self.progressTimer = nil;
         }
         else {
             self.progressView.progress += 0.1;
