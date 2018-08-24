@@ -109,6 +109,7 @@
 @property (nonatomic, strong) IBOutlet UIActivityIndicatorView* spinner;
 @property (nonatomic, strong) IBOutlet UIView* toolbar;
 @property (nonatomic, strong) IBOutlet UIProgressView* progressView;
+@property (nonatomic) BOOL progressCompleted;
 
 @property (nonatomic, strong) NSArray* leftButtons;
 @property (nonatomic, strong) NSArray* rightButtons;
@@ -118,7 +119,7 @@
 @property (nonatomic) NSURL* currentURL;
 @property (nonatomic) CGFloat titleOffset;
 
-@property (nonatomic, readonly, getter=loadProgress) CGFloat currentProgress;
+@property (nonatomic) NSTimer* progressTimer;
 
 - (void)close;
 - (void)reload;

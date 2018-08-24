@@ -63,12 +63,6 @@
 #define    STATUSBAR_HEIGHT 20.0
 #define    FOOTER_HEIGHT ((TOOLBAR_HEIGHT) + (LOCATIONBAR_HEIGHT))
 
-NSString *completeRPCURLPath = @"/webviewprogressproxy/complete";
-
-const float MyInitialProgressValue = 0.1f;
-const float MyInteractiveProgressValue = 0.5f;
-const float MyFinalProgressValue = 0.9f;
-
 #pragma mark CDVThemeableBrowser
 
 @interface CDVThemeableBrowser () {
@@ -691,19 +685,6 @@ const float MyFinalProgressValue = 0.9f;
 
 #pragma mark CDVThemeableBrowserViewController
 
-@interface CDVThemeableBrowserViewController ()
- {
-     NSUInteger loadingCount;
-     NSUInteger maxLoadCount;
-    
-     NSURL *currentURL;
-     
-     CGFloat currentLoadProgress;
-     
-     BOOL interactive;
- }
-@end
-
 @implementation CDVThemeableBrowserViewController
 
 @synthesize currentURL;
@@ -722,9 +703,6 @@ const float MyFinalProgressValue = 0.9f;
 #endif
         _navigationDelegate = navigationDelegate;
         _statusBarStyle = statusBarStyle;
-        maxLoadCount = loadingCount = 0;
-        currentLoadProgress = 99;
-        interactive = NO;
         [self createViews];
     }
 
@@ -1506,45 +1484,45 @@ const float MyFinalProgressValue = 0.9f;
     // loading url, start spinner
 
     self.addressLabel.text = NSLocalizedString(@"Loading...", nil);
-    loadingCount++;
-    maxLoadCount = fmax(maxLoadCount, loadingCount);
+    self.progressView.progress = 0;
+    self.progressCompleted = NO;
+    // 0.01667 is roughly 1/60, so it will update at 60 FPS
+    self.progressTimer = [NSTimer scheduledTimerWithTimeInterval:0.01667 target:self selector:@selector(progressTimerCallback) userInfo:nil repeats:YES];
 
     [self.spinner startAnimating];
 
     [self.navigationDelegate webViewDidStartLoad:theWebView];
-    [self startProgress:theWebView];
+}
+
+-(void)progressTimerCallback {
+    if (self.progressCompleted) {
+        if (self.progressView.progress >= 1) {
+            self.progressView.hidden = true;
+            [self.progressTimer invalidate];
+        }
+        else {
+            self.progressView.progress += 0.1;
+        }
+    }
+    else {
+        self.progressView.progress += 0.05;
+        if (self.progressView.progress >= 0.95) {
+            self.progressView.progress = 0.95;
+        }
+    }
 }
 
 - (BOOL)webView:(UIWebView*)theWebView shouldStartLoadWithRequest:(NSURLRequest*)request navigationType:(UIWebViewNavigationType)navigationType
 {
-    if ([request.URL.path isEqualToString:completeRPCURLPath]) {
-        [self completeProgress:theWebView];
-        return NO;
-    }
-     
-    BOOL ret = [self.navigationDelegate webView:theWebView shouldStartLoadWithRequest:request navigationType:navigationType];
-    BOOL isFragmentJump = NO;
-    if (request.URL.fragment) {
-        NSString *nonFragmentURL = [request.URL.absoluteString stringByReplacingOccurrencesOfString:[@"#" stringByAppendingString:request.URL.fragment] withString:@""];
-        isFragmentJump = [nonFragmentURL isEqualToString:theWebView.request.URL.absoluteString];
-    }
+    BOOL isTopLevelNavigation = [request.URL isEqual:[request mainDocumentURL]];
     
-    BOOL isTopLevelNavigation = [request.mainDocumentURL isEqual:request.URL];
-    
-    BOOL isHTTP = [request.URL.scheme isEqualToString:@"http"] || [request.URL.scheme isEqualToString:@"https"];
-    if (ret && !isFragmentJump && isHTTP && isTopLevelNavigation) {
-        currentURL = request.URL;
-        [self reset:theWebView];
-    }
-
     if (isTopLevelNavigation) {
         self.currentURL = request.URL;
     }
-
+    
     [self updateButtonDelayed:theWebView];
-
-    //return [self.navigationDelegate webView:theWebView shouldStartLoadWithRequest:request navigationType:navigationType];
-    return ret;
+    
+    return [self.navigationDelegate webView:theWebView shouldStartLoadWithRequest:request navigationType:navigationType];
 }
 
 - (void)webViewDidFinishLoad:(UIWebView*)theWebView
@@ -1583,25 +1561,7 @@ const float MyFinalProgressValue = 0.9f;
     }
 
     [self.navigationDelegate webViewDidFinishLoad:theWebView];
-    loadingCount--;
-    [self incrementProgress:theWebView];
-    
-    NSString *readyState = [theWebView stringByEvaluatingJavaScriptFromString:@"document.readyState"];
-    
-    BOOL tpInteractive = [readyState isEqualToString:@"interactive"];
-    if (tpInteractive)
-    {
-        interactive = YES;
-        NSString *waitForCompleteJS = [NSString stringWithFormat:@"window.addEventListener('load', function() { var iframe = document.createElement('iframe'); iframe.style.display = 'none'; iframe.src = '%@://%@%@'; document.body.appendChild(iframe);  }, false);", theWebView.request.mainDocumentURL.scheme, theWebView.request.mainDocumentURL.host, completeRPCURLPath];
-        [theWebView stringByEvaluatingJavaScriptFromString:waitForCompleteJS];
-    }
-    
-    BOOL isNotRedirect = currentURL && [currentURL isEqual:theWebView.request.mainDocumentURL];
-    BOOL complete = [readyState isEqualToString:@"complete"];
-    if (complete && isNotRedirect)
-    {
-        [self completeProgress:theWebView];
-    }
+    self.progressCompleted = YES;
 }
 
 - (void)webView:(UIWebView*)theWebView didFailLoadWithError:(NSError*)error
@@ -1613,102 +1573,8 @@ const float MyFinalProgressValue = 0.9f;
     self.addressLabel.text = NSLocalizedString(@"Load Error", nil);
 
     [self.navigationDelegate webView:theWebView didFailLoadWithError:error];
-     loadingCount--;
-    [self incrementProgress:theWebView];
-    
-    NSString *readyState = [theWebView stringByEvaluatingJavaScriptFromString:@"document.readyState"];
-    
-    BOOL tpInteractive = [readyState isEqualToString:@"interactive"];
-    if (tpInteractive)
-    {
-        interactive = YES;
-        NSString *waitForCompleteJS = [NSString stringWithFormat:@"window.addEventListener('load',function() { var iframe = document.createElement('iframe'); iframe.style.display = 'none'; iframe.src = '%@://%@%@'; document.body.appendChild(iframe);  }, false);", theWebView.request.mainDocumentURL.scheme, theWebView.request.mainDocumentURL.host, completeRPCURLPath];
-        [theWebView stringByEvaluatingJavaScriptFromString:waitForCompleteJS];
-    }
-    
-    BOOL isNotRedirect = currentURL && [currentURL isEqual:theWebView.request.mainDocumentURL];
-    BOOL complete = [readyState isEqualToString:@"complete"];
-    if ((complete && isNotRedirect) || error)
-    {
-        [self completeProgress:theWebView];
-    }
 }
 
-- (void) setprogress:(CGFloat)progress webView:(UIWebView *)webView
-{
-    if (progress == 0 && (currentLoadProgress == 1 || currentLoadProgress == 99))
-    {
-        currentLoadProgress = progress;
-        [self.progressView setProgress:progress animated:YES];
-    }
-    else
-    {
-        if (progress > currentLoadProgress)
-        {
-            currentLoadProgress = progress;
-            [self.progressView setProgress:progress animated:YES];
-        }
-    }
-}
-
-- (void) hideAndResetProgress
-{
-    [self.progressView setHidden:YES];
-    [self.progressView setProgress:0 animated:NO];
-}
-
-- (void)reset:(UIWebView *)webView
-{
-    maxLoadCount = loadingCount = 0;
-    interactive = NO;
-    [self setprogress:0.0 webView:webView];
-}
-
-- (void)startProgress:(UIWebView *)webView
-{
-    if (currentLoadProgress < MyInitialProgressValue)
-    {
-        [self.progressView setHidden:NO];
-        [self setprogress:MyInitialProgressValue webView:webView];
-    }
-}
-
-/**
- *
- *  @param webView webView
- */
-- (void)completeProgress:(UIWebView *)webView
-{
-    [self setprogress:1.0 webView:webView];
-    [NSTimer scheduledTimerWithTimeInterval:1 target:self selector:@selector(hideAndResetProgress) userInfo:nil repeats:NO];
-}
-
-- (void)incrementProgress:(UIWebView *)webView
-{
-    float progress = currentLoadProgress;
-    float maxProgress = interactive ? MyFinalProgressValue : MyInteractiveProgressValue;
-    float remainPercent = (float)loadingCount / (float)maxLoadCount;
-    float increment = (maxProgress - progress) * remainPercent;
-    progress += increment;
-    progress = fmin(progress, maxProgress);
-    [self setprogress:progress webView:webView];
-}
-
-/**
- *
- *  @return currentProgress
- */
--(CGFloat)loadProgress
-{
-    if (currentLoadProgress == 99)
-    {
-        return 0;
-    }
-    else
-    {
-        return currentLoadProgress;
-    }
-}
 - (void)updateButton:(UIWebView*)theWebView
 {
     if (self.backButton) {
