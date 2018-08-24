@@ -763,6 +763,7 @@ public class ThemeableBrowser extends CordovaPlugin {
                                 features.menu.items);
                         adapter.setDropDownViewResource(
                                 android.R.layout.simple_spinner_dropdown_item);
+                        menu.setDropDownVerticalOffset(25);
                         menu.setAdapter(adapter);
                         menu.setOnItemSelectedListener(
                                 new AdapterView.OnItemSelectedListener() {
