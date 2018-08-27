@@ -1585,6 +1585,7 @@
     self.addressLabel.text = NSLocalizedString(@"Load Error", nil);
 
     [self.navigationDelegate webView:theWebView didFailLoadWithError:error];
+    self.progressCompleted = YES;
 }
 
 - (void)updateButton:(UIWebView*)theWebView
