@@ -41,7 +41,11 @@
 #define    kThemeableBrowserPropWwwImagePressed @"wwwImagePressed"
 #define    kThemeableBrowserPropWwwImageDensity @"wwwImageDensity"
 #define    kThemeableBrowserPropStaticText @"staticText"
+#define    kThemeableBrowserPropShowProgress @"showProgress"
 #define    kThemeableBrowserPropShowPageTitle @"showPageTitle"
+#define    kThemeableBrowserPropTitleTextSize @"textSize"
+#define    kThemeableBrowserPropProgressBgColor @"progressBgColor"
+#define    kThemeableBrowserPropProgressColor @"progressColor"
 #define    kThemeableBrowserPropAlign @"align"
 #define    kThemeableBrowserPropTitle @"title"
 #define    kThemeableBrowserPropCancel @"cancel"
@@ -364,7 +368,25 @@
         }
     });
 }
+- (void)hide:(CDVInvokedUrlCommand*)command
+{
+    /*
+    if (self.themeableBrowserViewController == nil) {
+        NSLog(@"Tried to hide IAB after it was closed.");
+        return;
+    }
+    if (_previousStatusBarStyle == -1) {
+        NSLog(@"Tried to hide IAB while already hidden");
+        return;
+    }
+    */
 
+    if (self.themeableBrowserViewController != nil) {
+        [[self.themeableBrowserViewController presentingViewController] dismissViewControllerAnimated:YES completion:nil];
+        _isShown = NO;
+        /*_previousStatusBarStyle = -1;*/
+    }
+}
 - (void)openInCordovaWebView:(NSURL*)url withOptions:(NSString*)options
 {
     NSURLRequest* request = [NSURLRequest requestWithURL:url];
@@ -905,12 +927,21 @@
         if (_browserOptions.title[kThemeableBrowserPropStaticText]) {
             self.titleLabel.text = _browserOptions.title[kThemeableBrowserPropStaticText];
         }
-
+        CGFloat textSize = [self getFloatFromDict:_browserOptions.title withKey:kThemeableBrowserPropTitleTextSize withDefault:12];
+        self.titleLabel.font=[UIFont systemFontOfSize:textSize];
         [self.toolbar addSubview:self.titleLabel];
     }
 
     self.view.backgroundColor = [CDVThemeableBrowserViewController colorFromRGBA:[self getStringFromDict:_browserOptions.statusbar withKey:kThemeableBrowserPropColor withDefault:@"#ffffffff"]];
     [self.view addSubview:self.toolbar];
+    self.progressView=[[UIProgressView   alloc] initWithFrame:CGRectMake(0.0, toolbarY+toolbarHeight+[self getStatusBarOffset], self.view.bounds.size.width, 20.0)];
+    self.progressView.autoresizingMask = UIViewAutoresizingFlexibleWidth|UIViewAutoresizingFlexibleHeight;
+    self.progressView.progressViewStyle = UIProgressViewStyleDefault;
+    self.progressView.progressTintColor = [CDVThemeableBrowserViewController colorFromRGBA:[self getStringFromDict:_browserOptions.browserProgress withKey: kThemeableBrowserPropProgressColor withDefault:@"#0000FF"]];
+    self.progressView.trackTintColor = [CDVThemeableBrowserViewController colorFromRGBA:[self getStringFromDict:_browserOptions.browserProgress withKey:kThemeableBrowserPropProgressBgColor withDefault:@"#808080"]];
+    if ([self getBoolFromDict:_browserOptions.browserProgress withKey:kThemeableBrowserPropShowProgress]) {
+        [self.view addSubview:self.progressView];
+    }
     // [self.view addSubview:self.addressLabel];
     // [self.view addSubview:self.spinner];
 }
@@ -1237,6 +1268,7 @@
 - (void)stopLoading
 {
     [self.webView stopLoading];
+    self.progressCompleted = YES;
 }
 
 - (void)goBack
@@ -1252,6 +1284,8 @@
 {
     [self emitEventForButton:_browserOptions.backButton];
 
+    self.progressCompleted = YES;
+    
     if (self.webView.canGoBack) {
         [self.webView goBack];
         [self updateButtonDelayed:self.webView];
@@ -1264,6 +1298,8 @@
 {
     [self emitEventForButton:_browserOptions.forwardButton];
 
+    self.progressCompleted = YES;
+    
     [self.webView goForward];
     [self updateButtonDelayed:self.webView];
 }
@@ -1453,22 +1489,51 @@
     // loading url, start spinner
 
     self.addressLabel.text = NSLocalizedString(@"Loading...", nil);
+    self.progressView.progress = 0;
+    self.progressView.hidden = NO;
+    self.progressCompleted = NO;
+    
+    if (self.progressTimer != nil) {
+        [self.progressTimer invalidate];
+    }
+    
+    // 0.01667 is roughly 1/60, so it will update at 60 FPS
+    self.progressTimer = [NSTimer scheduledTimerWithTimeInterval:0.01667 target:self selector:@selector(progressTimerCallback) userInfo:nil repeats:YES];
 
     [self.spinner startAnimating];
 
-    return [self.navigationDelegate webViewDidStartLoad:theWebView];
+    [self.navigationDelegate webViewDidStartLoad:theWebView];
+}
+
+-(void)progressTimerCallback {
+    if (self.progressCompleted) {
+        if (self.progressView.progress >= 1) {
+            self.progressView.hidden = YES;
+            [self.progressTimer invalidate];
+            self.progressTimer = nil;
+        }
+        else {
+            self.progressView.progress += 0.1;
+        }
+    }
+    else {
+        self.progressView.progress += 0.05;
+        if (self.progressView.progress >= 0.95) {
+            self.progressView.progress = 0.95;
+        }
+    }
 }
 
 - (BOOL)webView:(UIWebView*)theWebView shouldStartLoadWithRequest:(NSURLRequest*)request navigationType:(UIWebViewNavigationType)navigationType
 {
     BOOL isTopLevelNavigation = [request.URL isEqual:[request mainDocumentURL]];
-
+    
     if (isTopLevelNavigation) {
         self.currentURL = request.URL;
     }
-
+    
     [self updateButtonDelayed:theWebView];
-
+    
     return [self.navigationDelegate webView:theWebView shouldStartLoadWithRequest:request navigationType:navigationType];
 }
 
@@ -1507,6 +1572,8 @@
         [CDVUserAgentUtil setUserAgent:_prevUserAgent lockToken:_userAgentLockToken];
     }
 
+    [self.navigationDelegate webViewDidFinishLoad:theWebView];
+    self.progressCompleted = YES;
 }
 
 - (void)webView:(UIWebView*)theWebView didFailLoadWithError:(NSError*)error
@@ -1518,6 +1585,7 @@
     self.addressLabel.text = NSLocalizedString(@"Load Error", nil);
 
     [self.navigationDelegate webView:theWebView didFailLoadWithError:error];
+    self.progressCompleted = YES;
 }
 
 - (void)updateButton:(UIWebView*)theWebView

@@ -49,6 +49,7 @@
 @property (nonatomic) NSDictionary* statusbar;
 @property (nonatomic) NSDictionary* toolbar;
 @property (nonatomic) NSDictionary* title;
+@property (nonatomic) NSDictionary* browserProgress;
 @property (nonatomic) NSDictionary* backButton;
 @property (nonatomic) NSDictionary* forwardButton;
 @property (nonatomic) NSDictionary* closeButton;
@@ -75,6 +76,7 @@
 - (void)injectScriptCode:(CDVInvokedUrlCommand*)command;
 - (void)show:(CDVInvokedUrlCommand*)command;
 - (void)show:(CDVInvokedUrlCommand*)command withAnimation:(BOOL)animated;
+- (void)hide:(CDVInvokedUrlCommand*)command;
 - (void)reload:(CDVInvokedUrlCommand*)command;
 - (void)goBack:(CDVInvokedUrlCommand*)command;
 - (void)stopLoading:(CDVInvokedUrlCommand*)command;
@@ -106,6 +108,8 @@
 @property (nonatomic, strong) IBOutlet UIButton* menuButton;
 @property (nonatomic, strong) IBOutlet UIActivityIndicatorView* spinner;
 @property (nonatomic, strong) IBOutlet UIView* toolbar;
+@property (nonatomic, strong) IBOutlet UIProgressView* progressView;
+@property (nonatomic) BOOL progressCompleted;
 
 @property (nonatomic, strong) NSArray* leftButtons;
 @property (nonatomic, strong) NSArray* rightButtons;
@@ -114,6 +118,8 @@
 @property (nonatomic, weak) CDVThemeableBrowser* navigationDelegate;
 @property (nonatomic) NSURL* currentURL;
 @property (nonatomic) CGFloat titleOffset;
+
+@property (nonatomic) NSTimer* progressTimer;
 
 - (void)close;
 - (void)reload;
