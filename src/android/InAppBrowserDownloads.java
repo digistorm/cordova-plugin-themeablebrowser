@@ -113,7 +113,6 @@ public class InAppBrowserDownloads implements DownloadListener{
         plugin.cordova.getActivity().registerReceiver(attachmentDownloadCompleteReceive, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
 
         try {
-            request.setMimeType(InAppBrowserDownloads.this.mimetype);
             String cookies = CookieManager.getInstance().getCookie(InAppBrowserDownloads.this.url);
             request.addRequestHeader("Cookie", cookies);
             request.addRequestHeader("User-Agent", InAppBrowserDownloads.this.userAgent);
@@ -122,9 +121,21 @@ public class InAppBrowserDownloads implements DownloadListener{
 
             // URLUtil.guessFileName doesn't work when the content-disposition is inline so implement our own check
             String filename = parseAnyContentDisposition(InAppBrowserDownloads.this.contentDisposition);
-            if (filename==null) {
+            if (filename == null) {
                 filename = URLUtil.guessFileName(InAppBrowserDownloads.this.url, InAppBrowserDownloads.this.contentDisposition, InAppBrowserDownloads.this.mimetype);
             }
+
+            String requestMimeType = InAppBrowserDownloads.this.mimetype;
+
+            // If the provided mime-type is generic try to guess from the filename
+            if ("application/octet-stream".equals(requestMimeType)) {
+                String guessedMimeType = this.getMimeType(filename);
+                if (guessedMimeType != null) {
+                    requestMimeType = guessedMimeType;
+                }
+            }
+            request.setMimeType(requestMimeType);
+
             request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, filename);
             DownloadManager dm = (DownloadManager) plugin.cordova.getActivity().getSystemService(DOWNLOAD_SERVICE);
             dm.enqueue(request);
