@@ -128,7 +128,10 @@ public class InAppBrowserDownloads implements DownloadListener{
             String requestMimeType = InAppBrowserDownloads.this.mimetype;
 
             // If the provided mime-type is generic try to guess from the filename
-            if ("application/octet-stream".equals(requestMimeType)) {
+            if (
+                "application/octet-stream".equals(requestMimeType) ||
+                "binary/octet-stream".equals(requestMimeType)
+            ) {
                 String guessedMimeType = this.getMimeType(filename);
                 if (guessedMimeType != null) {
                     requestMimeType = guessedMimeType;
